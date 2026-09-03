@@ -77,6 +77,8 @@ class SAWAgent(flax.struct.PyTreeNode):
         actor_info = {
             'actor_loss': actor_loss,
             'adv': adv.mean(),
+            'adv_std': adv.std(),
+            'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -108,6 +110,8 @@ class SAWAgent(flax.struct.PyTreeNode):
         awr_info = {
             'awr_loss': awr_loss,
             'adv': adv.mean(),
+            'adv_std': adv.std(),
+            'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -145,6 +149,8 @@ class SAWAgent(flax.struct.PyTreeNode):
             'waypoint_loss': waypoint_loss,
             'kld': kld.mean(),
             'wadv': wadv.mean(),
+            'wadv_std': wadv.std(),
+            'wadv_std_norm': wadv.std() / (jnp.abs(wadv.mean()) + 1e-8),
         }
 
         return waypoint_loss, waypoint_info

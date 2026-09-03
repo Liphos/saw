@@ -84,6 +84,8 @@ class HIQLAgent(flax.struct.PyTreeNode):
         actor_info = {
             'actor_loss': actor_loss,
             'adv': adv.mean(),
+            'adv_std': adv.std(),
+            'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -118,6 +120,8 @@ class HIQLAgent(flax.struct.PyTreeNode):
         return actor_loss, {
             'actor_loss': actor_loss,
             'adv': adv.mean(),
+            'adv_std': adv.std(),
+            'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
             'bc_log_prob': log_prob.mean(),
             'mse': jnp.mean((dist.mode() - target) ** 2),
             'std': jnp.mean(dist.scale_diag),
