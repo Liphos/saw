@@ -9,7 +9,7 @@ import ml_collections
 import optax
 from utils.encoders import GCEncoder, encoder_modules
 from utils.flax_utils import ModuleDict, TrainState, nonpytree_field
-from utils.networks import MLP, Identity, LengthNormalize, GCActor, GCDiscreteActor, GCDiscreteCritic, GCValue
+from utils.networks import MLP, GCActor, GCDiscreteActor, GCValue, Identity, LengthNormalize
 
 
 class SAWAgent(flax.struct.PyTreeNode):
@@ -98,7 +98,7 @@ class SAWAgent(flax.struct.PyTreeNode):
         nv = (nv1 + nv2) / 2
         adv = nv - v
 
-        exp_a = jnp.exp(adv * self.config['awr_alpha'])
+        exp_a = jnp.exp(adv * self.config['high_alpha'])
         exp_a = jnp.minimum(exp_a, 100.0)
 
         dist = self.network.select('actor')(batch['observations'], batch['high_actor_goals'], params=grad_params)
@@ -188,6 +188,7 @@ class SAWAgent(flax.struct.PyTreeNode):
 
         def loss_fn(grad_params):
             return self.total_loss(batch, grad_params, rng=rng)
+
         new_network, info = self.network.apply_loss_fn(loss_fn=loss_fn)
 
         self.target_update(new_network, 'value')
@@ -345,7 +346,7 @@ def get_config():
             tau=0.005,  # Target network update rate.
             expectile=0.7,  # IQL expectile.
             low_alpha=3.0,  # Temperature in low-level actor.
-            awr_alpha=3.0,  # Temperature in AWR.
+            high_alpha=3.0,  # Temperature in AWR.
             kl_alpha=3.0,  # Temperature for waypoint advantage.
             subgoal_steps=25,  # Number of steps to sample waypoints.
             const_std=True,  # Whether to use constant standard deviation for the actor.
