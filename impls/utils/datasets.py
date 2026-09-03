@@ -266,7 +266,7 @@ class GCDataset:
             # Uniform sampling.
             distances = np.random.rand(batch_size)  # in [0, 1)
             traj_goal_idxs = np.round(
-                (np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances))
+                np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances)
             ).astype(int)
         if p_curgoal == 1.0:
             goal_idxs = idxs
@@ -316,7 +316,15 @@ class HGCDataset(GCDataset):
     This class extends GCDataset to support high-level actor goals and prediction targets. It reads the following
     additional key from the config:
     - subgoal_steps: Subgoal steps (i.e., the number of steps to reach the low-level goal).
+
+    Attributes:
+        subgoal_info: Statistics of the realized subgoal horizon for the most recent batch (see sample()).
     """
+
+    def __post_init__(self):
+        super().__post_init__()
+
+        self.subgoal_info = {}
 
     def sample(self, batch_size, idxs=None, evaluation=False):
         """Sample a batch of transitions with goals.
@@ -367,7 +375,7 @@ class HGCDataset(GCDataset):
             # Uniform sampling.
             distances = np.random.rand(batch_size)  # in [0, 1)
             high_traj_goal_idxs = np.round(
-                (np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances))
+                np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances)
             ).astype(int)
         high_traj_target_idxs = np.minimum(idxs + self.config['subgoal_steps'], high_traj_goal_idxs)
 
@@ -382,6 +390,23 @@ class HGCDataset(GCDataset):
 
         batch['high_actor_goals'] = self.get_observations(high_goal_idxs)
         batch['high_actor_targets'] = self.get_observations(high_target_idxs)
+
+        subgoal_steps = self.config['subgoal_steps']
+        high_target_dists = high_target_idxs - idxs
+        high_traj_goal_dists = high_traj_goal_idxs - idxs
+        self.subgoal_info = dict(
+            high_target_dist=high_target_dists.mean(),  # Effective sugboal horizon
+            high_target_dist_std=high_target_dists.std(),
+            high_target_clip_frac=(
+                idxs + subgoal_steps > high_target_idxs
+            ).mean(),  # When waypoint close than subgoal step (i.e. because of clip)
+            high_target_degenerate_frac=(high_target_idxs == high_goal_idxs).mean(),  # waypoint is goal
+            chunk_ratio=(
+                (high_traj_target_idxs - idxs) / np.maximum(high_traj_goal_dists, 1)
+            ).mean(),  # How far goal is.
+            low_goal_dist=(low_goal_idxs - idxs).mean(),  # low level offset
+            low_goal_clip_frac=(idxs + subgoal_steps > low_goal_idxs).mean(),  # goal is closer
+        )
 
         if self.config['p_aug'] is not None and not evaluation:
             if np.random.rand() < self.config['p_aug']:

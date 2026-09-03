@@ -101,10 +101,16 @@ def main(_):
         # Log metrics.
         if i % FLAGS.log_interval == 0:
             train_metrics = {f'training/{k}': v for k, v in update_info.items()}
+            train_metrics.update(
+                {f'training/subgoal/{k}': v for k, v in getattr(train_dataset, 'subgoal_info', {}).items()}
+            )
             if val_dataset is not None:
                 val_batch = val_dataset.sample(config['batch_size'])
                 _, val_info = agent.total_loss(val_batch, grad_params=None)
                 train_metrics.update({f'validation/{k}': v for k, v in val_info.items()})
+                train_metrics.update(
+                    {f'validation/subgoal/{k}': v for k, v in getattr(val_dataset, 'subgoal_info', {}).items()}
+                )
             train_metrics['time/epoch_time'] = (time.time() - last_time) / FLAGS.log_interval
             train_metrics['time/total_time'] = time.time() - first_time
             last_time = time.time()
