@@ -66,6 +66,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
         adv = nv - v
 
         exp_a = jnp.exp(adv * self.config['low_alpha'])
+        clip_pct = (exp_a > 100.0).mean() * 100.0
         exp_a = jnp.minimum(exp_a, 100.0)
 
         # Compute the goal representations of the subgoals.
@@ -86,6 +87,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
             'adv': adv.mean(),
             'adv_std': adv.std(),
             'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
+            'adv_clip_pct': clip_pct,  # Percentage of the batch whose AWR weight is clipped at 100.
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -107,6 +109,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
         adv = nv - v
 
         exp_a = jnp.exp(adv * self.config['high_alpha'])
+        clip_pct = (exp_a > 100.0).mean() * 100.0
         exp_a = jnp.minimum(exp_a, 100.0)
 
         dist = self.network.select('high_actor')(batch['observations'], batch['high_actor_goals'], params=grad_params)
@@ -122,6 +125,7 @@ class HIQLAgent(flax.struct.PyTreeNode):
             'adv': adv.mean(),
             'adv_std': adv.std(),
             'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
+            'adv_clip_pct': clip_pct,  # Percentage of the batch whose AWR weight is clipped at 100.
             'bc_log_prob': log_prob.mean(),
             'mse': jnp.mean((dist.mode() - target) ** 2),
             'std': jnp.mean(dist.scale_diag),

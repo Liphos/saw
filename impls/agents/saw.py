@@ -67,6 +67,7 @@ class SAWAgent(flax.struct.PyTreeNode):
         adv = nv - v
 
         exp_a = jnp.exp(adv * self.config['low_alpha'])
+        clip_pct = (exp_a > 100.0).mean() * 100.0
         exp_a = jnp.minimum(exp_a, 100.0)
 
         dist = self.network.select('low_actor')(batch['observations'], batch['low_actor_goals'], params=grad_params)
@@ -79,6 +80,7 @@ class SAWAgent(flax.struct.PyTreeNode):
             'adv': adv.mean(),
             'adv_std': adv.std(),
             'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
+            'adv_clip_pct': clip_pct,  # Percentage of the batch whose AWR weight is clipped at 100.
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -101,6 +103,7 @@ class SAWAgent(flax.struct.PyTreeNode):
         adv = nv - v
 
         exp_a = jnp.exp(adv * self.config['high_alpha'])
+        clip_pct = (exp_a > 100.0).mean() * 100.0
         exp_a = jnp.minimum(exp_a, 100.0)
 
         dist = self.network.select('actor')(batch['observations'], batch['high_actor_goals'], params=grad_params)
@@ -112,6 +115,7 @@ class SAWAgent(flax.struct.PyTreeNode):
             'adv': adv.mean(),
             'adv_std': adv.std(),
             'adv_std_norm': adv.std() / (jnp.abs(adv.mean()) + 1e-8),
+            'adv_clip_pct': clip_pct,  # Percentage of the batch whose AWR weight is clipped at 100.
             'bc_log_prob': log_prob.mean(),
         }
         if not self.config['discrete']:
@@ -133,6 +137,7 @@ class SAWAgent(flax.struct.PyTreeNode):
         wadv = wv - v
 
         exp_w = jnp.exp(wadv * self.config['kl_alpha'])
+        clip_pct = (exp_w > 100.0).mean() * 100.0
         exp_w = jnp.minimum(exp_w, 100.0)
 
         # Compute waypoint KL divergence term
@@ -151,6 +156,7 @@ class SAWAgent(flax.struct.PyTreeNode):
             'wadv': wadv.mean(),
             'wadv_std': wadv.std(),
             'wadv_std_norm': wadv.std() / (jnp.abs(wadv.mean()) + 1e-8),
+            'wadv_clip_pct': clip_pct,  # Percentage of the batch whose waypoint weight is clipped at 100.
         }
 
         return waypoint_loss, waypoint_info
