@@ -394,6 +394,10 @@ class HGCDataset(GCDataset):
         subgoal_steps = self.config['subgoal_steps']
         high_target_dists = high_target_idxs - idxs
         high_traj_goal_dists = high_traj_goal_idxs - idxs
+
+        # Realized subgoal horizon k of each sample. This is not always `subgoal_steps`, since the target is clipped
+        # to the goal (or the trajectory end), so the agents need it to discount the k-step advantage by gamma^k.
+        batch['high_actor_target_dists'] = high_target_dists.astype(np.float32)
         self.subgoal_info = dict(
             high_target_dist=high_target_dists.mean(),  # Effective sugboal horizon
             high_target_dist_std=high_target_dists.std(),

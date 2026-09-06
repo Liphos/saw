@@ -63,7 +63,8 @@ class HIQLAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['next_observations'], batch['low_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        adv = nv - v
+        # Discounted one-step advantage: gamma * V(s_{t+1}, g) - V(s_t, g).
+        adv = self.config['discount'] * nv - v
 
         exp_a = jnp.exp(adv * self.config['low_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0
@@ -106,7 +107,10 @@ class HIQLAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['high_actor_targets'], batch['high_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        adv = nv - v
+        # Discounted k-step advantage: gamma^k * V(s_{t+k}, g) - V(s_t, g). The realized horizon k is per-sample, as
+        # the subgoal target is clipped to the goal (or the trajectory end).
+        discount_k = self.config['discount'] ** batch['high_actor_target_dists']
+        adv = discount_k * nv - v
 
         exp_a = jnp.exp(adv * self.config['high_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0
