@@ -2,7 +2,7 @@
 #SBATCH --job-name=new_metrics
 #SBATCH --output=logs/new_metrics_%A_%a.out
 #SBATCH --error=logs/new_metrics_%A_%a.err
-#SBATCH --array=0-359  # 2 algos * 6 envs * 6 subgoal_steps * 5 seeds
+#SBATCH --array=0-159  # 2 algos * 2 envs * 8 subgoal_steps * 5 seeds
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:volta:1
@@ -13,14 +13,10 @@ unset SLURM_CPU_BIND
 SEEDS=(3917 3502 8948 9460 4729)
 ALGOS=("hiql" "saw")
 ENVS=(
-    "antmaze-giant-navigate-v0"
-    "antmaze-large-navigate-v0"
-    "cube-single-play-v0"
-    "cube-double-play-v0"
-    "humanoidmaze-large-navigate-v0"
-    "humanoidmaze-giant-navigate-v0"
+    "pointmaze-large-navigate02noise-v0"
+    "pointmaze-giant-navigate02noise-v0"
 )
-SUBGOAL_STEPS=(5 10 25 50 100 250)
+SUBGOAL_STEPS=(2 3 5 10 25 50 100 250)
 
 NUM_ALGOS=${#ALGOS[@]}
 NUM_ENVS=${#ENVS[@]}
