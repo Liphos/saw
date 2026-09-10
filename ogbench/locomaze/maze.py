@@ -439,7 +439,7 @@ def make_maze_env(loco_env_type, maze_env_type, *args, **kwargs):
                         break
 
             # Check if the agent has reached the goal.
-            if np.linalg.norm(self.get_xy() - self.cur_goal_xy) <= self._goal_tol:
+            if self.is_goal_reached(self.get_xy(), self.cur_goal_xy):
                 if self._terminate_at_goal:
                     terminated = True
                 info['success'] = 1.0
@@ -471,6 +471,16 @@ def make_maze_env(loco_env_type, maze_env_type, *args, **kwargs):
         def get_oracle_rep(self):
             """Return the oracle goal representation (i.e., the goal position)."""
             return np.array(self.cur_goal_xy)
+
+        def get_goal_conditioned_state(self, observations):
+            """Extract the agent positions used by the goal-conditioned success check."""
+            if self._ob_type != 'states':
+                raise ValueError('Goal-conditioned success relabeling requires state observations.')
+            return np.asarray(observations)[..., :2]
+
+        def is_goal_reached(self, states, goals):
+            """Apply the environment's goal-radius success condition to arbitrary state-goal pairs."""
+            return np.linalg.norm(np.asarray(states) - np.asarray(goals), axis=-1) <= self._goal_tol
 
         def set_goal(self, goal_ij=None, goal_xy=None):
             """Set the goal position and update the target object."""
@@ -672,7 +682,7 @@ def make_maze_env(loco_env_type, maze_env_type, *args, **kwargs):
             ob, reward, terminated, truncated, info = super(MazeEnv, self).step(action)
 
             # Check if the ball has reached the goal.
-            if np.linalg.norm(self.get_agent_ball_xy()[1] - self.cur_goal_xy) <= self._goal_tol:
+            if self.is_goal_reached(self.get_agent_ball_xy()[1], self.cur_goal_xy):
                 if self._terminate_at_goal:
                     terminated = True
                 info['success'] = 1.0
@@ -686,6 +696,13 @@ def make_maze_env(loco_env_type, maze_env_type, *args, **kwargs):
                 reward = reward - 1.0  # -1 (failure) or 0 (success).
 
             return ob, reward, terminated, truncated, info
+
+        def get_goal_conditioned_state(self, observations):
+            """Extract the ball positions used by the goal-conditioned success check."""
+            if self._ob_type != 'states':
+                raise ValueError('Goal-conditioned success relabeling requires state observations.')
+            ball_qpos_start = self.model.nq - 7
+            return np.asarray(observations)[..., ball_qpos_start : ball_qpos_start + 2]
 
         def get_agent_ball_xy(self):
             agent_xy = self.data.qpos[:2].copy()

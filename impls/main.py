@@ -63,9 +63,19 @@ def main(_):
         'GCDataset': GCDataset,
         'HGCDataset': HGCDataset,
     }[config['dataset_class']]
-    train_dataset = dataset_class(Dataset.create(**train_dataset), config)
+    goal_condition = None
+    if config.get('compute_actor_rewards', False):
+        unwrapped_env = env.unwrapped
+        if (
+            getattr(unwrapped_env, '_ob_type', None) == 'states'
+            and hasattr(unwrapped_env, 'get_goal_conditioned_state')
+            and hasattr(unwrapped_env, 'is_goal_reached')
+        ):
+            goal_condition = unwrapped_env
+
+    train_dataset = dataset_class(Dataset.create(**train_dataset), config, goal_condition=goal_condition)
     if val_dataset is not None:
-        val_dataset = dataset_class(Dataset.create(**val_dataset), config)
+        val_dataset = dataset_class(Dataset.create(**val_dataset), config, goal_condition=goal_condition)
 
     # Initialize agent.
     random.seed(FLAGS.seed)

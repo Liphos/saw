@@ -173,11 +173,14 @@ class GCDataset:
         config: Configuration dictionary.
         preprocess_frame_stack: Whether to preprocess frame stacks. If False, frame stacks are computed on-the-fly. This
             saves memory but may slow down training.
+        goal_condition: Optional environment object that exposes `get_goal_conditioned_state` and `is_goal_reached`.
+            These methods are used to relabel rewards for sampled actor goals with the environment's success condition.
     """
 
     dataset: Dataset
     config: Any
     preprocess_frame_stack: bool = True
+    goal_condition: Any = None
 
     def __post_init__(self):
         self.size = self.dataset.size
@@ -195,12 +198,33 @@ class GCDataset:
             self.config['actor_p_curgoal'] + self.config['actor_p_trajgoal'] + self.config['actor_p_randomgoal'], 1.0
         )
 
+        self.goal_conditioned_states = None
+        if self.config.get('compute_actor_rewards', False) and self.goal_condition is not None:
+            # Keep only the state components used by the environment's success condition. This makes relabeling the
+            # rewards along a multi-step target substantially cheaper than materializing full observation sequences.
+            self.goal_conditioned_states = self.goal_condition.get_goal_conditioned_state(self.dataset['observations'])
+
         if self.config['frame_stack'] is not None:
             # Only support compact (observation-only) datasets.
             assert 'next_observations' not in self.dataset
             if self.preprocess_frame_stack:
                 stacked_observations = self.get_stacked_observations(np.arange(self.size))
                 self.dataset = Dataset(self.dataset.copy(dict(observations=stacked_observations)))
+
+    def get_goal_successes(self, state_idxs, goal_idxs):
+        """Return whether indexed states satisfy indexed goals under the environment's success condition."""
+        if self.goal_conditioned_states is None:
+            # Exact index equality is the default goal-conditioned success condition used by the dataset.
+            return np.asarray(state_idxs) == np.asarray(goal_idxs)
+
+        states = self.goal_conditioned_states[state_idxs]
+        goals = self.goal_conditioned_states[goal_idxs]
+        return np.asarray(self.goal_condition.is_goal_reached(states, goals))
+
+    def get_goal_rewards(self, state_idxs, goal_idxs):
+        """Return relabeled rewards for indexed state-goal pairs."""
+        successes = self.get_goal_successes(state_idxs, goal_idxs).astype(np.float32)
+        return successes - (1.0 if self.config['gc_negative'] else 0.0)
 
     def sample(self, batch_size, idxs=None, evaluation=False):
         """Sample a batch of transitions with goals.
@@ -398,6 +422,25 @@ class HGCDataset(GCDataset):
         # Realized subgoal horizon k of each sample. This is not always `subgoal_steps`, since the target is clipped
         # to the goal (or the trajectory end), so the agents need it to discount the k-step advantage by gamma^k.
         batch['high_actor_target_dists'] = high_target_dists.astype(np.float32)
+
+        if self.config.get('compute_actor_rewards', False):
+            # Relabel actor rewards against their independently sampled goals. Comparing dataset indices is not enough:
+            # the environment may consider nearby or partially matching states successful as well.
+            batch['low_actor_rewards'] = self.get_goal_rewards(idxs, low_goal_idxs)
+            batch['high_actor_rewards'] = self.get_goal_rewards(idxs, high_goal_idxs)
+
+            # Compute the discounted rewards for every state before the high-level target. The target horizon is
+            # sample-dependent because it can be clipped to the sampled goal or the end of the trajectory.
+            reward_offsets = np.arange(subgoal_steps)
+            reward_idxs = np.minimum(idxs[:, None] + reward_offsets[None, :], final_state_idxs[:, None])
+            reward_goal_idxs = np.broadcast_to(high_goal_idxs[:, None], reward_idxs.shape)
+            step_rewards = self.get_goal_rewards(reward_idxs, reward_goal_idxs)
+            valid_rewards = reward_offsets[None, :] < high_target_dists[:, None]
+            discounts = self.config['discount'] ** reward_offsets
+            batch['high_actor_discounted_rewards'] = np.sum(
+                step_rewards * valid_rewards * discounts[None, :], axis=1
+            ).astype(np.float32)
+
         self.subgoal_info = dict(
             high_target_dist=high_target_dists.mean(),  # Effective sugboal horizon
             high_target_dist_std=high_target_dists.std(),

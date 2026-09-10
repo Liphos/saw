@@ -66,6 +66,9 @@ class CubeEnv(ManipSpaceEnv):
                 self._colors['white'],
             ]
         )
+        self._cube_goal_tol = 0.04
+        self._cube_xyz_center = np.array([0.425, 0.0, 0.0])
+        self._cube_xyz_scaler = 10.0
 
         # Target info.
         self._target_task = 'cube'
@@ -708,16 +711,45 @@ class CubeEnv(ManipSpaceEnv):
 
     def _compute_successes(self):
         """Compute object successes."""
-        cube_successes = []
-        for i in range(self._num_cubes):
-            obj_pos = self._data.joint(f'object_joint_{i}').qpos[:3]
-            tar_pos = self._data.mocap_pos[self._cube_target_mocap_ids[i]]
-            if np.linalg.norm(obj_pos - tar_pos) <= 0.04:
-                cube_successes.append(True)
-            else:
-                cube_successes.append(False)
+        cube_xyzs = np.stack([self._data.joint(f'object_joint_{i}').qpos[:3] for i in range(self._num_cubes)], axis=0)
+        target_xyzs = np.stack(
+            [self._data.mocap_pos[self._cube_target_mocap_ids[i]] for i in range(self._num_cubes)], axis=0
+        )
+        cube_successes = self._get_cube_successes(cube_xyzs, target_xyzs)
 
-        return cube_successes
+        return list(cube_successes)
+
+    def _get_cube_successes(self, cube_xyzs, target_xyzs):
+        """Apply the environment's position tolerance to corresponding cubes."""
+        return np.linalg.norm(np.asarray(cube_xyzs) - np.asarray(target_xyzs), axis=-1) <= self._cube_goal_tol
+
+    def is_goal_reached(self, states, goals):
+        """Apply the environment's all-cubes success condition to arbitrary state-goal pairs."""
+        return np.all(self._get_cube_successes(states, goals), axis=-1)
+
+    def get_goal_conditioned_state(self, observations):
+        """Extract cube positions from state observations for goal-conditioned reward relabeling."""
+        if self._ob_type != 'states':
+            raise ValueError('Goal-conditioned success relabeling requires state observations.')
+
+        observations = np.asarray(observations)
+        oracle_dim = self._num_cubes * 3
+        if observations.shape[-1] == oracle_dim:
+            cube_reps = observations.reshape(*observations.shape[:-1], self._num_cubes, 3)
+        else:
+            cube_feature_dim = 9  # xyz, quaternion, cos(yaw), sin(yaw)
+            cube_start = observations.shape[-1] - self._num_cubes * cube_feature_dim
+            if cube_start < 0:
+                raise ValueError(f'Unexpected cube observation shape: {observations.shape}.')
+            cube_reps = np.stack(
+                [
+                    observations[..., cube_start + i * cube_feature_dim : cube_start + i * cube_feature_dim + 3]
+                    for i in range(self._num_cubes)
+                ],
+                axis=-2,
+            )
+
+        return cube_reps / self._cube_xyz_scaler + self._cube_xyz_center
 
     def post_step(self):
         # Check if the cubes are in the target positions.
@@ -767,15 +799,13 @@ class CubeEnv(ManipSpaceEnv):
         if self._ob_type == 'pixels':
             return self.get_pixel_observation()
         else:
-            xyz_center = np.array([0.425, 0.0, 0.0])
-            xyz_scaler = 10.0
             gripper_scaler = 3.0
 
             ob_info = self.compute_ob_info()
             ob = [
                 ob_info['proprio/joint_pos'],
                 ob_info['proprio/joint_vel'],
-                (ob_info['proprio/effector_pos'] - xyz_center) * xyz_scaler,
+                (ob_info['proprio/effector_pos'] - self._cube_xyz_center) * self._cube_xyz_scaler,
                 np.cos(ob_info['proprio/effector_yaw']),
                 np.sin(ob_info['proprio/effector_yaw']),
                 ob_info['proprio/gripper_opening'] * gripper_scaler,
@@ -784,7 +814,7 @@ class CubeEnv(ManipSpaceEnv):
             for i in range(self._num_cubes):
                 ob.extend(
                     [
-                        (ob_info[f'privileged/block_{i}_pos'] - xyz_center) * xyz_scaler,
+                        (ob_info[f'privileged/block_{i}_pos'] - self._cube_xyz_center) * self._cube_xyz_scaler,
                         ob_info[f'privileged/block_{i}_quat'],
                         np.cos(ob_info[f'privileged/block_{i}_yaw']),
                         np.sin(ob_info[f'privileged/block_{i}_yaw']),
@@ -795,13 +825,10 @@ class CubeEnv(ManipSpaceEnv):
 
     def compute_oracle_observation(self):
         """Return the oracle goal representation of the current state."""
-        xyz_center = np.array([0.425, 0.0, 0.0])
-        xyz_scaler = 10.0
-
         ob_info = self.compute_ob_info()
         ob = []
         for i in range(self._num_cubes):
-            ob.append((ob_info[f'privileged/block_{i}_pos'] - xyz_center) * xyz_scaler)
+            ob.append((ob_info[f'privileged/block_{i}_pos'] - self._cube_xyz_center) * self._cube_xyz_scaler)
 
         return np.concatenate(ob)
 

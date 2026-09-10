@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=correct_adv
-#SBATCH --output=logs/correct_adv_%A_%a.out
-#SBATCH --error=logs/correct_adv_%A_%a.err
-#SBATCH --array=0-359  # 2 algos * 6 envs * 6 subgoal_steps * 5 seeds
+#SBATCH --job-name=success_reward_adv
+#SBATCH --output=logs/success_reward_adv_%A_%a.out
+#SBATCH --error=logs/success_reward_adv_%A_%a.err
+#SBATCH --array=0-479  # 2 algos * 8 envs * 6  subgoal_steps * 5 seeds
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:volta:1
@@ -15,6 +15,12 @@ ALGOS=("hiql" "saw")
 ENVS=(
     "pointmaze-giant-navigate-v0"
     "pointmaze-large-navigate-v0"
+    "antmaze-giant-navigate-v0"
+    "antmaze-large-navigate-v0"
+    "cube-single-play-v0"
+    "cube-double-play-v0"
+    "humanoidmaze-large-navigate-v0"
+    "humanoidmaze-giant-navigate-v0"
 )
 SUBGOAL_STEPS=(5 10 25 50 100 250)
 
@@ -33,7 +39,10 @@ SUBGOAL_STEP=${SUBGOAL_STEPS[$SUBGOAL_STEP_IDX]}
 
 source .venv/bin/activate
 
-EXTRA_ARGS=("--agent.subgoal_steps=${SUBGOAL_STEP}")
+EXTRA_ARGS=(
+    "--agent.subgoal_steps=${SUBGOAL_STEP}"
+    "--agent.compute_actor_rewards=True"
+)
 
 case "$ENV" in
     cube-single-play-v0)
@@ -56,5 +65,5 @@ srun python main.py \
     --eval_episodes=50 \
     --agent="agents/${ALGO}.py" \
     --seed="$SEED" \
-    --run_group="${ALGO}_correct_adv" \
+    --run_group="${ALGO}_success_reward_adv" \
     "${EXTRA_ARGS[@]}"

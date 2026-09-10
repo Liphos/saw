@@ -64,8 +64,8 @@ class SAWAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['next_observations'], batch['low_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        # One-step advantage with the goal-conditioned reward r(s, g) = -1 before reaching the goal.
-        adv = -1.0 + self.config['discount'] * nv - v
+        # One-step advantage with rewards relabeled for the sampled low-level goals.
+        adv = batch['low_actor_rewards'] + self.config['discount'] * nv - v
 
         exp_a = jnp.exp(adv * self.config['low_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0
@@ -101,8 +101,8 @@ class SAWAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['next_observations'], batch['high_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        # One-step advantage with the goal-conditioned reward r(s, g) = -1 before reaching the goal.
-        adv = -1.0 + self.config['discount'] * nv - v
+        # One-step advantage with rewards relabeled for the sampled high-level goals.
+        adv = batch['high_actor_rewards'] + self.config['discount'] * nv - v
 
         exp_a = jnp.exp(adv * self.config['high_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0
@@ -137,15 +137,9 @@ class SAWAgent(flax.struct.PyTreeNode):
         v = (v1 + v2) / 2
         wv = (wv1 + wv2) / 2
         # The realized horizon k is per-sample because the waypoint target is clipped to the goal (or trajectory end).
-        # Include all k rewards of -1 in the k-step advantage.
         target_dists = batch['high_actor_target_dists']
-        discount = self.config['discount']
-        discount_k = discount**target_dists
-        if discount == 1.0:
-            discounted_rewards = -target_dists
-        else:
-            discounted_rewards = -(1.0 - discount_k) / (1.0 - discount)
-        wadv = discounted_rewards + discount_k * wv - v
+        discount_k = self.config['discount'] ** target_dists
+        wadv = batch['high_actor_discounted_rewards'] + discount_k * wv - v
 
         exp_w = jnp.exp(wadv * self.config['kl_alpha'])
         clip_pct = (exp_w > 100.0).mean() * 100.0
@@ -388,6 +382,7 @@ def get_config():
             actor_p_randomgoal=0.0,  # Probability of using a random state as the actor goal.
             actor_geom_sample=False,  # Whether to use geometric sampling for future actor goals.
             actor_geom_discount=0.99,  # Discount factor for actor goals if using geometric sampling.
+            compute_actor_rewards=True,  # Whether to relabel actor rewards using the environment's success condition.
             gc_negative=True,  # Whether to use '0 if s == g else -1' (True) or '1 if s == g else 0' (False) as reward.
             p_aug=0.0,  # Probability of applying image augmentation.
             frame_stack=ml_collections.config_dict.placeholder(int),  # Number of frames to stack.
