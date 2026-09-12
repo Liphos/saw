@@ -134,7 +134,8 @@ class SAWAgent(flax.struct.PyTreeNode):
         wv1, wv2 = self.network.select('value')(batch['high_actor_targets'], batch['high_actor_goals'])
         v = (v1 + v2) / 2
         wv = (wv1 + wv2) / 2
-        wadv = wv - v
+        discount_k = self.config['discount'] ** batch['high_actor_target_dists']
+        wadv = discount_k / (1 - discount_k) * (wv - v)
 
         exp_w = jnp.exp(wadv * self.config['kl_alpha'])
         clip_pct = (exp_w > 100.0).mean() * 100.0

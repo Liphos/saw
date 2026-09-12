@@ -394,6 +394,7 @@ class HGCDataset(GCDataset):
         subgoal_steps = self.config['subgoal_steps']
         high_target_dists = high_target_idxs - idxs
         high_traj_goal_dists = high_traj_goal_idxs - idxs
+        batch['high_actor_target_dists'] = high_target_dists.astype(np.float32)
         self.subgoal_info = dict(
             high_target_dist=high_target_dists.mean(),  # Effective sugboal horizon
             high_target_dist_std=high_target_dists.std(),
