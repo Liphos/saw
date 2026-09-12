@@ -106,9 +106,12 @@ class HIQLAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['high_actor_targets'], batch['high_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        discount_k = self.config['discount'] ** batch['high_actor_target_dists']
+        target_dists = batch['high_actor_target_dists']
+        valid_targets = target_dists > 0
+        safe_target_dists = jnp.maximum(target_dists, 1.0)
+        discount_k = self.config['discount'] ** safe_target_dists
         adv = discount_k / (1 - discount_k) * (nv - v)
-
+        adv = jnp.where(valid_targets, adv, nv - v)
         exp_a = jnp.exp(adv * self.config['high_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0
         exp_a = jnp.minimum(exp_a, 100.0)
