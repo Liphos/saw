@@ -26,7 +26,7 @@ NUM_HIGH_ALPHAS=${#HIGH_ALPHAS[@]}
 ALGO_IDX=$((SLURM_ARRAY_TASK_ID % NUM_ALGOS))
 ENV_IDX=$(((SLURM_ARRAY_TASK_ID / NUM_ALGOS) % NUM_ENVS))
 SUBGOAL_STEP_IDX=$(((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS)) % NUM_SUBGOAL_STEPS))
-HIGH_ALPHA_IDX=$((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_SUBGOAL_STEPS)% NUM_HIGH_ALPHAS))
+HIGH_ALPHA_IDX=$(((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_SUBGOAL_STEPS)) % NUM_HIGH_ALPHAS))
 SEED_IDX=$((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_SUBGOAL_STEPS * NUM_HIGH_ALPHAS)))
 
 SEED=${SEEDS[$SEED_IDX]}
@@ -39,14 +39,18 @@ source .venv/bin/activate
 
 EXTRA_ARGS=("--agent.subgoal_steps=${SUBGOAL_STEP}")
 
-if [ "$ALGO" = "saw" ]; then
-    EXTRA_ARGS+=("--agent.kl_alpha=${HIGH_ALPHA}")
+if [ "$ENV" = "antmaze-giant-navigate-v0" ]; then
+    EXTRA_ARGS+=("--agent.discount=0.995")
 fi
-;;
-if [ "$ALGO" = "hiql" ]; then
-    EXTRA_ARGS+=("--agent.high_alpha=${HIGH_ALPHA}")
-fi
-;;
+
+case "$ALGO" in
+    saw)
+        EXTRA_ARGS+=("--agent.kl_alpha=${HIGH_ALPHA}")
+        ;;
+    hiql)
+        EXTRA_ARGS+=("--agent.high_alpha=${HIGH_ALPHA}")
+        ;;
+esac
 
 srun python main.py \
     --env_name="$ENV" \
