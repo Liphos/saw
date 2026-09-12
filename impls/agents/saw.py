@@ -141,9 +141,10 @@ class SAWAgent(flax.struct.PyTreeNode):
         wadv = discount_k / (1 - discount_k) * (wv - v)
         wadv = jnp.where(valid_targets, wadv, wv - v)
 
-        exp_w = jnp.exp(wadv * self.config['kl_alpha'])
-        clip_pct = (exp_w > 100.0).mean() * 100.0
-        exp_w = jnp.minimum(exp_w, 100.0)
+        scaled_wadv = wadv * self.config['kl_alpha']
+        max_log_weight = jnp.log(100.0)
+        clip_pct = (scaled_wadv > max_log_weight).mean() * 100.0
+        exp_w = jnp.exp(jnp.minimum(scaled_wadv, max_log_weight))
 
         # Compute waypoint KL divergence term
         dist = self.network.select('actor')(batch['observations'], batch['high_actor_goals'], params=grad_params)
