@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=new_metrics
-#SBATCH --output=logs/new_metrics_%A_%a.out
-#SBATCH --error=logs/new_metrics_%A_%a.err
+#SBATCH --job-name=norm_proxy
+#SBATCH --output=logs/norm_proxy_%A_%a.out
+#SBATCH --error=logs/norm_proxy_%A_%a.err
 #SBATCH --array=0-479  # 2 algos * 8 envs * 6 subgoal_steps * 5 seeds
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
@@ -62,5 +62,5 @@ srun python main.py \
     --eval_episodes=50 \
     --agent="agents/${ALGO}.py" \
     --seed="$SEED" \
-    --run_group="${ALGO}_new_metrics" \
+    --run_group="${ALGO}_norm_proxy" \
     "${EXTRA_ARGS[@]}"
