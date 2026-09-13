@@ -4,7 +4,7 @@
 #SBATCH --error=logs/sweep_alpha_norm_%A_%a.err
 #SBATCH --array=0-599  # 2 algos * 2 envs * 6 subgoal_steps * 5 seeds * 5 alphas
 #SBATCH --time=08:00:00
-#SBATCH --cpus-per-task=5
+#SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:volta:1
 #SBATCH --constraint=volta32gb
 
