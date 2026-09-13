@@ -4,7 +4,7 @@
 #SBATCH --error=logs/sweep_alpha_norm_%A_%a.err
 #SBATCH --array=0-599  # 2 algos * 2 envs * 6 subgoal_steps * 5 seeds * 5 alphas
 #SBATCH --time=08:00:00
-#SBATCH --cpus-per-task=10
+#SBATCH --cpus-per-task=5
 #SBATCH --gres=gpu:volta:1
 #SBATCH --constraint=volta32gb
 
@@ -13,8 +13,12 @@ unset SLURM_CPU_BIND
 SEEDS=(3917 3502 8948 9460 4729)
 ALGOS=("hiql" "saw")
 ENVS=(
-    "antmaze-giant-navigate-v0"
-    "antmaze-large-navigate-v0"
+    "pointmaze-giant-navigate-v0"
+    "pointmaze-large-navigate-v0"
+    "cube-single-play-v0"
+    "cube-double-play-v0"
+    "humanoidmaze-large-navigate-v0"
+    "humanoidmaze-giant-navigate-v0"
 )
 SUBGOAL_STEPS=(5 10 25 50 100 250)
 HIGH_ALPHAS=(0.05 0.1 0.5 1 5)
