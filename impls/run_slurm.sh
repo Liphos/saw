@@ -2,7 +2,7 @@
 #SBATCH --job-name=sweep_alpha_norm
 #SBATCH --output=logs/sweep_alpha_norm_%A_%a.out
 #SBATCH --error=logs/sweep_alpha_norm_%A_%a.err
-#SBATCH --array=0-599  # 2 algos * 2 envs * 6 subgoal_steps * 5 seeds * 5 alphas
+#SBATCH --array=0-59  # 2 algos * 6 envs * 5 seeds * 1 alpha
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:volta:1
@@ -20,28 +20,24 @@ ENVS=(
     "humanoidmaze-large-navigate-v0"
     "humanoidmaze-giant-navigate-v0"
 )
-SUBGOAL_STEPS=(5 10 25 50 100 250)
-HIGH_ALPHAS=(0.05 0.1 0.5 1 5)
+HIGH_ALPHAS=(0.5)
 
 NUM_ALGOS=${#ALGOS[@]}
 NUM_ENVS=${#ENVS[@]}
-NUM_SUBGOAL_STEPS=${#SUBGOAL_STEPS[@]}
 NUM_HIGH_ALPHAS=${#HIGH_ALPHAS[@]}
 ALGO_IDX=$((SLURM_ARRAY_TASK_ID % NUM_ALGOS))
 ENV_IDX=$(((SLURM_ARRAY_TASK_ID / NUM_ALGOS) % NUM_ENVS))
-SUBGOAL_STEP_IDX=$(((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS)) % NUM_SUBGOAL_STEPS))
-HIGH_ALPHA_IDX=$(((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_SUBGOAL_STEPS)) % NUM_HIGH_ALPHAS))
-SEED_IDX=$((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_SUBGOAL_STEPS * NUM_HIGH_ALPHAS)))
+HIGH_ALPHA_IDX=$(((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS)) % NUM_HIGH_ALPHAS))
+SEED_IDX=$((SLURM_ARRAY_TASK_ID / (NUM_ALGOS * NUM_ENVS * NUM_HIGH_ALPHAS)))
 
 SEED=${SEEDS[$SEED_IDX]}
 ALGO=${ALGOS[$ALGO_IDX]}
 ENV=${ENVS[$ENV_IDX]}
-SUBGOAL_STEP=${SUBGOAL_STEPS[$SUBGOAL_STEP_IDX]}
 HIGH_ALPHA=${HIGH_ALPHAS[$HIGH_ALPHA_IDX]}
 
 source .venv/bin/activate
 
-EXTRA_ARGS=("--agent.subgoal_steps=${SUBGOAL_STEP}")
+EXTRA_ARGS=()
 
 if [ "$ENV" = "antmaze-giant-navigate-v0" ]; then
     EXTRA_ARGS+=("--agent.discount=0.995")
