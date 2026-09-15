@@ -345,7 +345,8 @@ def get_config():
             expectile=0.7,  # IQL expectile.
             low_alpha=3.0,  # Low-level AWR temperature.
             high_alpha=3.0,  # High-level AWR temperature.
-            subgoal_steps=25,  # Subgoal steps.
+            subgoal_steps_min=5,  # Minimum sampled subgoal step (inclusive).
+            subgoal_steps_max=250,  # Maximum sampled subgoal step (inclusive).
             rep_dim=10,  # Goal representation dimension.
             low_actor_rep_grad=False,  # Whether low-actor gradients flow to goal representation (use True for pixels).
             const_std=True,  # Whether to use constant standard deviation for the actors.

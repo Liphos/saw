@@ -316,6 +316,8 @@ class HGCDataset(GCDataset):
     This class extends GCDataset to support high-level actor goals and prediction targets. It reads the following
     additional key from the config:
     - subgoal_steps: Subgoal steps (i.e., the number of steps to reach the low-level goal).
+    - subgoal_steps_min: Optional minimum sampled subgoal step (inclusive).
+    - subgoal_steps_max: Optional maximum sampled subgoal step (inclusive).
 
     Attributes:
         subgoal_info: Statistics of the realized subgoal horizon for the most recent batch (see sample()).
@@ -324,7 +326,23 @@ class HGCDataset(GCDataset):
     def __post_init__(self):
         super().__post_init__()
 
+        subgoal_steps_min = self.config.get('subgoal_steps_min')
+        subgoal_steps_max = self.config.get('subgoal_steps_max')
+        if (subgoal_steps_min is None) != (subgoal_steps_max is None):
+            raise ValueError('subgoal_steps_min and subgoal_steps_max must either both be set or both be None')
+        if subgoal_steps_min is not None and not (1 <= subgoal_steps_min <= subgoal_steps_max):
+            raise ValueError('subgoal step range must satisfy 1 <= subgoal_steps_min <= subgoal_steps_max')
+
         self.subgoal_info = {}
+
+    def sample_subgoal_steps(self, batch_size):
+        """Sample one subgoal horizon per transition."""
+        subgoal_steps_min = self.config.get('subgoal_steps_min')
+        if subgoal_steps_min is None:
+            return np.full(batch_size, self.config['subgoal_steps'], dtype=np.int64)
+
+        subgoal_steps_max = self.config['subgoal_steps_max']
+        return np.random.randint(subgoal_steps_min, subgoal_steps_max + 1, size=batch_size)
 
     def sample(self, batch_size, idxs=None, evaluation=False):
         """Sample a batch of transitions with goals.
@@ -361,8 +379,9 @@ class HGCDataset(GCDataset):
         batch['rewards'] = successes - (1.0 if self.config['gc_negative'] else 0.0)
 
         # Set low-level actor goals.
+        subgoal_steps = self.sample_subgoal_steps(batch_size)
         final_state_idxs = self.terminal_locs[np.searchsorted(self.terminal_locs, idxs)]
-        low_goal_idxs = np.minimum(idxs + self.config['subgoal_steps'], final_state_idxs)
+        low_goal_idxs = np.minimum(idxs + subgoal_steps, final_state_idxs)
         batch['low_actor_goals'] = self.get_observations(low_goal_idxs)
 
         # Sample high-level actor goals and set prediction targets.
@@ -377,11 +396,11 @@ class HGCDataset(GCDataset):
             high_traj_goal_idxs = np.round(
                 np.minimum(idxs + 1, final_state_idxs) * distances + final_state_idxs * (1 - distances)
             ).astype(int)
-        high_traj_target_idxs = np.minimum(idxs + self.config['subgoal_steps'], high_traj_goal_idxs)
+        high_traj_target_idxs = np.minimum(idxs + subgoal_steps, high_traj_goal_idxs)
 
         # High-level random goals.
         high_random_goal_idxs = self.dataset.get_random_idxs(batch_size)
-        high_random_target_idxs = np.minimum(idxs + self.config['subgoal_steps'], final_state_idxs)
+        high_random_target_idxs = np.minimum(idxs + subgoal_steps, final_state_idxs)
 
         # Pick between high-level future goals and random goals.
         pick_random = np.random.rand(batch_size) < self.config['actor_p_randomgoal']
@@ -391,11 +410,12 @@ class HGCDataset(GCDataset):
         batch['high_actor_goals'] = self.get_observations(high_goal_idxs)
         batch['high_actor_targets'] = self.get_observations(high_target_idxs)
 
-        subgoal_steps = self.config['subgoal_steps']
         high_target_dists = high_target_idxs - idxs
         high_traj_goal_dists = high_traj_goal_idxs - idxs
         batch['high_actor_target_dists'] = high_target_dists.astype(np.float32)
         self.subgoal_info = dict(
+            sampled_step=subgoal_steps.mean(),
+            sampled_step_std=subgoal_steps.std(),
             high_target_dist=high_target_dists.mean(),  # Effective sugboal horizon
             high_target_dist_std=high_target_dists.std(),
             high_target_clip_frac=(

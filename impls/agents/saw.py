@@ -366,7 +366,8 @@ def get_config():
             low_alpha=3.0,  # Temperature in low-level actor.
             high_alpha=3.0,  # Temperature in AWR.
             kl_alpha=3.0,  # Temperature for waypoint advantage.
-            subgoal_steps=25,  # Number of steps to sample waypoints.
+            subgoal_steps_min=5,  # Minimum sampled subgoal step (inclusive).
+            subgoal_steps_max=250,  # Maximum sampled subgoal step (inclusive).
             const_std=True,  # Whether to use constant standard deviation for the actor.
             discrete=False,  # Whether the action space is discrete.
             encoder=ml_collections.config_dict.placeholder(str),  # Visual encoder name (None, 'impala_small', etc.).
