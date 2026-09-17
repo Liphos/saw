@@ -1,8 +1,8 @@
 #!/bin/bash
-#SBATCH --job-name=success_reward_adv
-#SBATCH --output=logs/success_reward_adv_%A_%a.out
-#SBATCH --error=logs/success_reward_adv_%A_%a.err
-#SBATCH --array=0-479  # 2 algos * 8 envs * 6  subgoal_steps * 5 seeds
+#SBATCH --job-name=reward_at_goal
+#SBATCH --output=logs/reward_at_goal_%A_%a.out
+#SBATCH --error=logs/reward_at_goal_%A_%a.err
+#SBATCH --array=0-179  # 1 algos * 6 envs * 6  subgoal_steps * 5 seeds
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
 #SBATCH --gres=gpu:volta:1
@@ -11,10 +11,8 @@
 unset SLURM_CPU_BIND
 
 SEEDS=(3917 3502 8948 9460 4729)
-ALGOS=("hiql" "saw")
+ALGOS=("hiql")
 ENVS=(
-    "pointmaze-giant-navigate-v0"
-    "pointmaze-large-navigate-v0"
     "antmaze-giant-navigate-v0"
     "antmaze-large-navigate-v0"
     "cube-single-play-v0"
@@ -42,6 +40,7 @@ source .venv/bin/activate
 EXTRA_ARGS=(
     "--agent.subgoal_steps=${SUBGOAL_STEP}"
     "--agent.compute_actor_rewards=True"
+    "--agent.gc_negative=False"
 )
 
 case "$ENV" in
@@ -65,5 +64,5 @@ srun python main.py \
     --eval_episodes=50 \
     --agent="agents/${ALGO}.py" \
     --seed="$SEED" \
-    --run_group="${ALGO}_success_reward_adv" \
+    --run_group="${ALGO}_reward_at_goal" \
     "${EXTRA_ARGS[@]}"
