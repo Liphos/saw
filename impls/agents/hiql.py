@@ -63,8 +63,8 @@ class HIQLAgent(flax.struct.PyTreeNode):
         nv1, nv2 = self.network.select('value')(batch['next_observations'], batch['low_actor_goals'])
         v = (v1 + v2) / 2
         nv = (nv1 + nv2) / 2
-        # One-step advantage with rewards relabeled for the sampled low-level goals.
-        adv = batch['low_actor_rewards'] + self.config['discount'] * nv - v
+        # HIQL uses the value difference as a proxy for the low-level action advantage.
+        adv = nv - v
 
         exp_a = jnp.exp(adv * self.config['low_alpha'])
         clip_pct = (exp_a > 100.0).mean() * 100.0

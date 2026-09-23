@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=reward_at_goal
-#SBATCH --output=logs/reward_at_goal_%A_%a.out
-#SBATCH --error=logs/reward_at_goal_%A_%a.err
+#SBATCH --job-name=correct_adv_high
+#SBATCH --output=logs/correct_adv_high_%A_%a.out
+#SBATCH --error=logs/correct_adv_high_%A_%a.err
 #SBATCH --array=0-199  # 1 algos * 2 envs * 4 subgoal_steps * 5 alphas * 5 seeds 
 #SBATCH --time=08:00:00
 #SBATCH --cpus-per-task=10
@@ -65,5 +65,5 @@ srun python main.py \
     --eval_episodes=50 \
     --agent="agents/${ALGO}.py" \
     --seed="$SEED" \
-    --run_group="${ALGO}_reward_at_goal" \
+    --run_group="${ALGO}_correct_adv_high" \
     "${EXTRA_ARGS[@]}"
